@@ -1,22 +1,41 @@
+# Manual integration test against real store items. Use dedicated test extensions.
+# The shared workflow pins its helper and store action to the matching release.
 name: Test Deploy Action
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: Store to process
+        type: choice
+        options: [both, chrome, edge]
+        default: both
+      operation:
+        description: Operation (status does not modify the stores)
+        type: choice
+        options: [status, upload, publish, deploy]
+        default: status
+      source-run-id:
+        description: Original upload run (optional; matching upload is selected automatically)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Deploy
-        uses: ./
-        with:
-          zip-path: tests/fixtures/dist.zip
-          targets: chrome, edge
-          chrome-extension-id: ${{ vars.CHROME_EXTENSION_ID }}
-          edge-product-id: ${{ vars.EDGE_PRODUCT_ID }}
-        env:
-          CHROME_SERVICE_ACCOUNT_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
-          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
-          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      targets: ${{ inputs.targets == 'both' && 'chrome, edge' || inputs.targets }}
+      operation: ${{ inputs.operation }}
+      source-run-id: ${{ inputs.source-run-id }}
+      build-command: cp tests/fixtures/dist.zip extension.zip
+      chrome-publisher-id: ${{ vars.CHROME_PUBLISHER_ID }}
+      chrome-extension-id: ${{ vars.CHROME_EXTENSION_ID }}
+      edge-product-id: ${{ vars.EDGE_PRODUCT_ID }}
+    secrets:
+      CHROME_SERVICE_ACCOUNT_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
